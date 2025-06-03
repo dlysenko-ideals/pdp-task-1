@@ -65,8 +65,8 @@ jobs:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: arn:aws:iam::397517475538:role/github-actions-role
-          aws-region: eu-central-1
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ secrets.AWS_REGION }}
 
       - name: Login to Amazon ECR
         id: login-ecr
@@ -80,3 +80,33 @@ jobs:
         run: |
           docker build -t $REGISTRY/$REPOSITORY:$IMAGE_TAG -f docker/Dockerfile .
           docker push $REGISTRY/$REPOSITORY:$IMAGE_TAG
+
+      - name: Trigger deployment via Lambda webhook
+        env:
+          REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          REPOSITORY: pdp/task-1
+          IMAGE_TAG: ${{ github.sha }}
+          LAMBDA_URL: ${{ secrets.LAMBDA_DEPLOYMENT_URL }}
+        run: |
+          echo "Triggering deployment for image: $REGISTRY/$REPOSITORY:$IMAGE_TAG"
+
+          # Send webhook to Lambda URL
+          curl -X POST "$LAMBDA_URL" \
+            -H "Content-Type: application/json" \
+            -H "User-Agent: GitHub-Actions-CI/CD" \
+            -d "{
+              \"ecrRegistry\": \"$REGISTRY\",
+              \"imageName\": \"$REPOSITORY\",
+              \"imageTag\": \"$IMAGE_TAG\"
+            }" \
+            --fail \
+            --show-error \
+            --silent \
+            --write-out "HTTP Status: %{http_code}\nResponse Time: %{time_total}s\n"
+
+          if [ $? -eq 0 ]; then
+            echo "✅ Deployment webhook sent successfully"
+          else
+            echo "❌ Failed to send deployment webhook"
+            exit 1
+          fi
