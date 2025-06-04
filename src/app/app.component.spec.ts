@@ -20,6 +20,6 @@ describe('AppComponent', () => {
     const fixture = TestBed.createComponent(AppComponent);
     fixture.detectChanges();
     const compiled = fixture.nativeElement as HTMLElement;
-    expect(compiled.querySelector('h1')?.textContent).toContain('Hello, pdp-task-0');
+    expect(compiled.querySelector('h1')?.textContent).toContain('Hello, pdp-task-1');
   });
 });
